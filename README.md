@@ -1,5 +1,7 @@
 # ASP.NET + npx Docker Image with MCP Client
 
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/Azure-Samples/app-service-ai-dotnet-chatbot-npx-mcp-client)
+
 This sample demonstrates how to run a Model Context Protocol (MCP) client inside an Azure App Service using a custom container that includes both the .NET runtime and Node.js/npx. The default Linux App Service images for .NET do not include Node.js or npx, which is a popular method to run an MCP server (such as [@modelcontextprotocol/server-filesystem](https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem)). By building a custom Docker image with both runtimes, this sample enables your ASP.NET Core app to invoke MCP tools using npx at runtime.
 
 **How it works:**
@@ -24,14 +26,15 @@ The included AZD template provisions the following Azure resources:
 ## Deploy to Azure
 
 1. Open the repository in a codespace.
-4. Login to Azure:
+
+2. Login to Azure:
 
 ```bash
 azd auth login
 az login
 ```
 
-5. Provision the resources:
+3. Provision the resources:
 
 ```bash
 azd provision
