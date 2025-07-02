@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: mcp-host-app
+metadata:
+  template: mcp-host-app@0.0.1-beta
+hooks:
+  postprovision:
+    shell: sh
+    run: |
+      echo "Setting up container registry authentication..."
+      # Build and push the container image
+      az acr build --registry $AZURE_CONTAINER_REGISTRY_NAME --image aspnet-npx:latest .
+      
+      echo "Updating web app container configuration..."
+      # Deploy the container configuration update using Bicep
+      az deployment group create \
+        --resource-group $AZURE_RESOURCE_GROUP \
+        --template-file ./infra/update-container.bicep \
+        --parameters \
+          appServiceName="$AZURE_APP_SERVICE_NAME" \
+          containerRegistryLoginServer="$AZURE_CONTAINER_REGISTRY_ENDPOINT" \
+          containerImageName="aspnet-npx:latest"

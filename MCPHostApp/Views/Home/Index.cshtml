@@ -1,0 +1,232 @@
+@{
+    ViewData["Title"] = "Home";
+    Layout = "_Layout";
+}
+
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mb-4">
+            <i class="fas fa-comments text-primary me-2"></i>
+            MCP-Powered ChatBot
+        </h1>
+        
+        <div class="tools-panel" id="toolsPanel" style="display: none;">
+            <h6><i class="fas fa-tools me-2"></i>Available MCP Tools:</h6>
+            <div id="toolsList" class="small text-muted"></div>
+        </div>
+
+        <div class="chat-container" id="chatContainer">
+            <div class="message assistant-message">
+                <strong>Assistant:</strong> Hello! I'm your MCP-powered assistant. I can help you with file operations and other tasks using the Model Context Protocol. What would you like me to help you with?
+            </div>
+        </div>
+
+        <div class="input-container">
+            <div class="input-group">
+                <input type="text" class="form-control" id="messageInput" placeholder="Type your message here..." />
+                <button class="btn btn-primary" type="button" id="sendButton">
+                    <i class="fas fa-paper-plane me-1"></i>Send
+                </button>
+            </div>
+            <div class="form-text">
+                <small class="text-muted">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Try asking me to list files, read a file, or create new content!
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl("/chathub")
+            .build();
+
+        let conversationHistory = [];
+        let isTyping = false;
+        let currentStreamMessage = '';
+
+        // Start the connection
+        connection.start().then(function () {
+            console.log("Connected to ChatHub");
+            // Get available tools on connection
+            connection.invoke("GetAvailableTools");
+        }).catch(function (err) {
+            console.error("Connection failed: ", err.toString());
+            addMessage("System", "Failed to connect to the chat server: " + err.toString());
+        });
+
+        // Receive regular messages
+        connection.on("ReceiveMessage", function (user, message) {
+            addMessage(user, message);
+            
+            // Add to conversation history
+            if (user === "Assistant") {
+                conversationHistory.push({ role: "assistant", content: message });
+            }
+        });
+
+        // Receive streaming message parts
+        connection.on("ReceiveMessageStream", function (messageChunk) {
+            if (!isTyping) {
+                // Start a new streaming message
+                currentStreamMessage = '';
+                addStreamMessage();
+                isTyping = true;
+            }
+            currentStreamMessage += messageChunk;
+            updateStreamMessage(currentStreamMessage);
+        });
+
+        // Handle typing indicator
+        connection.on("TypingIndicator", function (typing) {
+            if (typing && !isTyping) {
+                showTypingIndicator();
+            } else if (!typing && isTyping) {
+                hideTypingIndicator();
+                finalizeStreamMessage();
+                isTyping = false;
+            }
+        });
+
+        // Receive available tools
+        connection.on("ReceiveAvailableTools", function (tools) {
+            displayAvailableTools(tools);
+        });
+
+        // Send message function
+        function sendMessage() {
+            const messageInput = document.getElementById("messageInput");
+            const message = messageInput.value.trim();
+            
+            if (message === "") return;
+
+            // Add user message to UI
+            addMessage("You", message);
+            
+            // Add to conversation history
+            conversationHistory.push({ role: "user", content: message });
+
+            // Clear input
+            messageInput.value = "";
+
+            // Send message to hub
+            connection.invoke("SendMessage", "You", message, conversationHistory)
+                .catch(function (err) {
+                    console.error("Send failed: ", err.toString());
+                    addMessage("System", "Failed to send message: " + err.toString());
+                });
+        }
+
+        // Add message to chat
+        function addMessage(user, message) {
+            const chatContainer = document.getElementById("chatContainer");
+            const messageDiv = document.createElement("div");
+            
+            let messageClass = "message ";
+            if (user === "You") {
+                messageClass += "user-message";
+            } else if (user === "System") {
+                messageClass += "system-message";
+            } else {
+                messageClass += "assistant-message";
+            }
+            
+            messageDiv.className = messageClass;
+            messageDiv.innerHTML = `<strong>${user}:</strong> ${escapeHtml(message)}`;
+            
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // Add streaming message placeholder
+        function addStreamMessage() {
+            const chatContainer = document.getElementById("chatContainer");
+            const messageDiv = document.createElement("div");
+            messageDiv.className = "message assistant-message";
+            messageDiv.id = "streamingMessage";
+            messageDiv.innerHTML = `<strong>Assistant:</strong> <span id="streamContent"></span>`;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // Update streaming message
+        function updateStreamMessage(content) {
+            const streamContent = document.getElementById("streamContent");
+            if (streamContent) {
+                streamContent.textContent = content;
+            }
+        }
+
+        // Finalize streaming message
+        function finalizeStreamMessage() {
+            const streamingMessage = document.getElementById("streamingMessage");
+            if (streamingMessage) {
+                streamingMessage.removeAttribute("id");
+                const streamContent = streamingMessage.querySelector("#streamContent");
+                if (streamContent) {
+                    streamContent.removeAttribute("id");
+                }
+                
+                // Add to conversation history
+                conversationHistory.push({ role: "assistant", content: currentStreamMessage });
+            }
+        }
+
+        // Show typing indicator
+        function showTypingIndicator() {
+            const chatContainer = document.getElementById("chatContainer");
+            const typingDiv = document.createElement("div");
+            typingDiv.id = "typingIndicator";
+            typingDiv.className = "typing-indicator";
+            typingDiv.innerHTML = `
+                <span class="typing-dots"></span>
+                <span class="typing-dots"></span>
+                <span class="typing-dots"></span>
+            `;
+            chatContainer.appendChild(typingDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // Hide typing indicator
+        function hideTypingIndicator() {
+            const typingIndicator = document.getElementById("typingIndicator");
+            if (typingIndicator) {
+                typingIndicator.remove();
+            }
+        }
+
+        // Display available tools
+        function displayAvailableTools(tools) {
+            const toolsPanel = document.getElementById("toolsPanel");
+            const toolsList = document.getElementById("toolsList");
+            
+            if (tools && tools.length > 0) {
+                toolsList.innerHTML = tools.join(", ");
+                toolsPanel.style.display = "block";
+            }
+        }
+
+        // Escape HTML to prevent XSS
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Event listeners
+        document.getElementById("sendButton").addEventListener("click", sendMessage);
+        document.getElementById("messageInput").addEventListener("keypress", function (e) {
+            if (e.key === "Enter") {
+                sendMessage();
+            }
+        });
+
+        // Focus on input when page loads
+        document.addEventListener("DOMContentLoaded", function() {
+            document.getElementById("messageInput").focus();
+        });
+    </script>
+}
