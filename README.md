@@ -4,6 +4,8 @@
 
 This sample demonstrates how to run a Model Context Protocol (MCP) client inside an Azure App Service using a custom container that includes both the .NET runtime and Node.js/npx. The default Linux App Service images for .NET do not include Node.js or npx, which is a popular method to run an MCP server (such as [@modelcontextprotocol/server-filesystem](https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem)). By building a custom Docker image with both runtimes, this sample enables your ASP.NET Core app to invoke MCP tools using npx at runtime.
 
+![screenshot of running app](image.png)
+
 **How it works:**
 
 - The Dockerfile builds an image with both .NET and Node.js (with npx).
